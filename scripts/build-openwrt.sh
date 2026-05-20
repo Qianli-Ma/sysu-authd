@@ -1,0 +1,165 @@
+#!/bin/sh
+set -eu
+
+SDK="${SDK:-}"
+PROJECT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+OUT_DIR="${OUT_DIR:-$PROJECT_DIR/dist/openwrt}"
+PKG_NAME="${PKG_NAME:-sysu-authd}"
+PKG_VERSION="${PKG_VERSION:-0.1.0}"
+PKG_RELEASE="${PKG_RELEASE:-1}"
+LUCI_PKG_NAME="${LUCI_PKG_NAME:-luci-app-sysu-authd}"
+LUCI_PKG_ARCH="all"
+
+if [ -z "$SDK" ]; then
+	echo "usage: SDK=/path/to/openwrt-sdk $0" >&2
+	exit 1
+fi
+
+SDK="$(CDPATH= cd -- "$SDK" && pwd)"
+TOOLCHAIN="${TOOLCHAIN:-$(find "$SDK/staging_dir" -maxdepth 1 -type d -name 'toolchain-*' | head -n 1)}"
+TARGET_STAGING="${TARGET_STAGING:-$(find "$SDK/staging_dir" -maxdepth 1 -type d -name 'target-*' | head -n 1)}"
+
+if [ -z "$TOOLCHAIN" ] || [ -z "$TARGET_STAGING" ]; then
+	echo "failed to find toolchain or target staging directory under $SDK/staging_dir" >&2
+	exit 1
+fi
+
+if [ -f "$TOOLCHAIN/info.mk" ]; then
+	# shellcheck disable=SC1090
+	. "$TOOLCHAIN/info.mk"
+fi
+
+TARGET_CROSS="${TARGET_CROSS:-}"
+if [ -z "$TARGET_CROSS" ]; then
+	TARGET_CROSS="$(find "$TOOLCHAIN/bin" -maxdepth 1 -type f -name '*-gcc' | sed 's/-gcc$//' | head -n 1)"
+	TARGET_CROSS="${TARGET_CROSS##*/}-"
+fi
+
+CC="${CC:-${TARGET_CROSS}gcc}"
+AR="${AR:-${TARGET_CROSS}ar}"
+STRIP="${STRIP:-${TARGET_CROSS}strip}"
+PKG_ARCH="${PKG_ARCH:-$(basename "$TARGET_STAGING" | sed -e 's/^target-//' -e 's/_musl.*$//' -e 's/+/_/g')}"
+
+if [ ! -x "$TOOLCHAIN/bin/$CC" ]; then
+	echo "missing OpenWrt compiler: $TOOLCHAIN/bin/$CC" >&2
+	exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+tar_time="${SOURCE_DATE_EPOCH_TIME:-2023-11-15 06:13:20 UTC}"
+
+build_ipk() {
+	root="$1"
+	work="$2"
+	ipk="$3"
+
+	cat > "$work/debian-binary" <<'EOF_DEBIAN'
+2.0
+EOF_DEBIAN
+
+	( cd "$root" && tar --format=gnu --sort=name --owner=0 --group=0 \
+		--numeric-owner --mtime="$tar_time" -cf - . | gzip -n > "$work/data.tar.gz" )
+	( cd "$work/control" && tar --format=gnu --sort=name --owner=0 --group=0 \
+		--numeric-owner --mtime="$tar_time" -cf - . | gzip -n > "$work/control.tar.gz" )
+
+	rm -f "$ipk"
+	( cd "$work" && tar --format=gnu --sort=name --owner=0 --group=0 \
+		--numeric-owner --mtime="$tar_time" -cf - ./debian-binary ./data.tar.gz ./control.tar.gz | gzip -n > "$ipk" )
+}
+
+(
+	cd "$PROJECT_DIR"
+	make clean
+	PATH="$TOOLCHAIN/bin:$PATH" STAGING_DIR="$SDK/staging_dir" make \
+		CC="$CC" \
+		AR="$AR" \
+		CFLAGS="${CFLAGS:--Os -pipe}" \
+		CPPFLAGS="${CPPFLAGS:--I$TARGET_STAGING/usr/include -I$TARGET_STAGING/include}" \
+		LDFLAGS="${LDFLAGS:--L$TARGET_STAGING/usr/lib -L$TARGET_STAGING/lib -Wl,--gc-sections -static-libgcc}" \
+		TARGET="$PKG_NAME-openwrt"
+	cp "$PKG_NAME-openwrt" "$OUT_DIR/$PKG_NAME"
+	PATH="$TOOLCHAIN/bin:$PATH" STAGING_DIR="$SDK/staging_dir" "$STRIP" "$OUT_DIR/$PKG_NAME"
+	make TARGET="$PKG_NAME-openwrt" clean
+)
+
+ROOT="$OUT_DIR/pkgroot"
+WORK="$OUT_DIR/ipkbuild"
+LUCI_ROOT="$OUT_DIR/luci-pkgroot"
+LUCI_WORK="$OUT_DIR/luci-ipkbuild"
+IPK="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_${PKG_ARCH}.ipk"
+LUCI_IPK="$OUT_DIR/${LUCI_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_${LUCI_PKG_ARCH}.ipk"
+
+rm -rf "$ROOT" "$WORK" "$LUCI_ROOT" "$LUCI_WORK"
+mkdir -p "$ROOT/usr/sbin" "$ROOT/etc/config" "$ROOT/etc/init.d" \
+	"$ROOT/etc/sysu-authd" "$ROOT/usr/libexec/rpcd" "$WORK/control"
+mkdir -p "$LUCI_ROOT/www" "$LUCI_WORK/control"
+
+install -m 0755 "$OUT_DIR/$PKG_NAME" "$ROOT/usr/sbin/$PKG_NAME"
+install -m 0644 "$PROJECT_DIR/openwrt/files/etc/config/sysu-authd" \
+	"$ROOT/etc/config/sysu-authd"
+install -m 0755 "$PROJECT_DIR/openwrt/files/etc/init.d/sysu-authd" \
+	"$ROOT/etc/init.d/sysu-authd"
+install -m 0755 "$PROJECT_DIR/openwrt/files/usr/libexec/rpcd/sysu-authd" \
+	"$ROOT/usr/libexec/rpcd/sysu-authd"
+
+cp -R "$PROJECT_DIR/openwrt/luci-app-sysu-authd/htdocs/." "$LUCI_ROOT/www/"
+cp -R "$PROJECT_DIR/openwrt/luci-app-sysu-authd/root/." "$LUCI_ROOT/"
+
+DAEMON_SIZE="$(du -sk "$ROOT" | awk '{print $1}')"
+LUCI_SIZE="$(du -sk "$LUCI_ROOT" | awk '{print $1}')"
+
+cat > "$WORK/control/control" <<EOF_CONTROL
+Package: $PKG_NAME
+Version: $PKG_VERSION-$PKG_RELEASE
+Depends: libc
+Source: local
+SourceName: $PKG_NAME
+Section: net
+Architecture: $PKG_ARCH
+Installed-Size: $DAEMON_SIZE
+Maintainer: sysu-authd project
+Description: SYSU Ruijie/OpenWrt auto authentication daemon
+EOF_CONTROL
+
+cat > "$WORK/control/conffiles" <<'EOF_CONFFILES'
+/etc/config/sysu-authd
+EOF_CONFFILES
+
+cat > "$WORK/control/postinst" <<'EOF_POSTINST'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || killall -HUP rpcd 2>/dev/null || true
+exit 0
+EOF_POSTINST
+chmod 0755 "$WORK/control/postinst"
+
+cat > "$LUCI_WORK/control/control" <<EOF_CONTROL
+Package: $LUCI_PKG_NAME
+Version: $PKG_VERSION-$PKG_RELEASE
+Depends: sysu-authd, rpcd, luci-base
+Source: local
+SourceName: $LUCI_PKG_NAME
+Section: luci
+Architecture: $LUCI_PKG_ARCH
+Installed-Size: $LUCI_SIZE
+Maintainer: sysu-authd project
+Description: LuCI web interface for sysu-authd
+EOF_CONTROL
+
+cat > "$LUCI_WORK/control/postinst" <<'EOF_POSTINST'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache
+	rm -rf /tmp/luci-modulecache/
+	killall -HUP rpcd 2>/dev/null || true
+}
+exit 0
+EOF_POSTINST
+chmod 0755 "$LUCI_WORK/control/postinst"
+
+build_ipk "$ROOT" "$WORK" "$IPK"
+build_ipk "$LUCI_ROOT" "$LUCI_WORK" "$LUCI_IPK"
+
+file "$OUT_DIR/$PKG_NAME"
+file "$IPK"
+file "$LUCI_IPK"
+sha256sum "$OUT_DIR/$PKG_NAME" "$IPK" "$LUCI_IPK"

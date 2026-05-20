@@ -1,0 +1,12 @@
+build/
+dist/
+sysu-authd
+sysu-authd-openwrt
+sysu-authd-openwrt-*
+*.o
+*.d
+*.ipk
+*.tar.gz
+*.tmp
+*.log
+.DS_Store
