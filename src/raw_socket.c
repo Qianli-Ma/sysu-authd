@@ -43,8 +43,10 @@ int raw_socket_open(raw_socket_t *sock, const char *device)
 	int fd;
 	unsigned int ifindex;
 
-	if (sock == NULL || device == NULL || *device == '\0')
+	if (sock == NULL || device == NULL || *device == '\0') {
+		errno = EINVAL;
 		return -1;
+	}
 
 	memset(sock, 0, sizeof(*sock));
 	sock->fd = -1;
@@ -55,6 +57,8 @@ int raw_socket_open(raw_socket_t *sock, const char *device)
 
 	ifindex = if_nametoindex(device);
 	if (ifindex == 0) {
+		if (errno == 0)
+			errno = ENODEV;
 		close(fd);
 		return -1;
 	}
@@ -134,14 +138,16 @@ int raw_socket_recv_frame(raw_socket_t *sock, uint8_t *buf, size_t buf_len,
 	uint16_t ethertype;
 	ssize_t got;
 
-	if (sock == NULL || sock->fd < 0 || buf == NULL || out_len == NULL)
+	if (sock == NULL || sock->fd < 0 || buf == NULL || out_len == NULL) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	memset(&addr, 0, sizeof(addr));
 	got = recvfrom(sock->fd, frame, sizeof(frame), MSG_DONTWAIT,
 		       (struct sockaddr *)&addr, &addr_len);
 	if (got < 0) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
 			*out_len = 0;
 			return 0;
 		}
@@ -162,8 +168,10 @@ int raw_socket_recv_frame(raw_socket_t *sock, uint8_t *buf, size_t buf_len,
 		return 0;
 	}
 
-	if ((size_t)got - ETH_HLEN > buf_len)
+	if ((size_t)got - ETH_HLEN > buf_len) {
+		errno = EMSGSIZE;
 		return -1;
+	}
 
 	if (src_mac != NULL)
 		memcpy(src_mac, frame + RAW_SOCKET_MAC_LEN, RAW_SOCKET_MAC_LEN);

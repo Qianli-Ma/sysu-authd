@@ -50,9 +50,13 @@ static int wait_with_timeout(pid_t pid, unsigned int timeout_sec)
 
 int dhcp_renew(const char *interface, bool dry_run)
 {
+	char object[128];
 	pid_t pid;
 
 	if (interface == NULL || *interface == '\0')
+		return -1;
+	if (snprintf(object, sizeof(object), "network.interface.%s", interface) >=
+	    (int)sizeof(object))
 		return -1;
 
 	if (dry_run) {
@@ -64,7 +68,7 @@ int dhcp_renew(const char *interface, bool dry_run)
 	if (pid < 0)
 		return -1;
 	if (pid == 0) {
-		execlp("ifup", "ifup", interface, (char *)NULL);
+		execlp("ubus", "ubus", "call", object, "renew", (char *)NULL);
 		_exit(127);
 	}
 

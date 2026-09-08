@@ -6,6 +6,7 @@
 #include "raw_socket.h"
 #include "utils.h"
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@
 #define BACKEND_EAP_BUF_LEN 1500U
 #define BACKEND_EAPOL_BUF_LEN 1600U
 #define EAPOL_START_INTERVAL_MS 3000U
+#define EAPOL_SOCKET_REOPEN_INTERVAL_MS 3000U
 
 typedef enum {
 	EAPOL_SESSION_IDLE = 0,
@@ -30,6 +32,7 @@ typedef struct {
 	uint64_t started_at_ms;
 	uint64_t last_start_ms;
 	uint64_t last_wait_log_ms;
+	uint64_t socket_reopen_after_ms;
 	unsigned int start_count;
 	bool dry_run;
 	bool socket_open;
@@ -339,6 +342,32 @@ static auth_backend_event_t eapol_tick(auth_backend_t *backend, uint64_t now_ms)
 	if (!ctx->reauth_enable && ctx->phase == EAPOL_SESSION_DONE)
 		return AUTH_BACKEND_EVENT_NONE;
 
+	if (!ctx->socket_open) {
+		int open_errno;
+
+		if (!ctx->authenticated) {
+			ctx->status = AUTH_BACKEND_STATUS_FAILED;
+			return AUTH_BACKEND_EVENT_FAILURE;
+		}
+		if (now_ms < ctx->socket_reopen_after_ms)
+			return AUTH_BACKEND_EVENT_NONE;
+
+		if (raw_socket_open(&ctx->sock, ctx->device) != 0) {
+			open_errno = errno;
+			ctx->socket_reopen_after_ms = now_ms +
+				EAPOL_SOCKET_REOPEN_INTERVAL_MS;
+			LOG_WARN("%s could not reopen EAPOL socket on %s: %s; retrying",
+				 ctx->backend_name, ctx->device,
+				 strerror(open_errno));
+			return AUTH_BACKEND_EVENT_NONE;
+		}
+
+		ctx->socket_open = true;
+		ctx->socket_reopen_after_ms = 0;
+		LOG_INFO("%s reopened EAPOL socket on %s",
+			 ctx->backend_name, ctx->device);
+	}
+
 	for (;;) {
 		uint8_t rx[BACKEND_RX_BUF_LEN];
 		uint8_t src_mac[RAW_SOCKET_MAC_LEN];
@@ -347,6 +376,18 @@ static auth_backend_event_t eapol_tick(auth_backend_t *backend, uint64_t now_ms)
 
 		if (raw_socket_recv_frame(&ctx->sock, rx, sizeof(rx), &rx_len,
 					  src_mac, &packet_type) != 0) {
+			int recv_errno = errno;
+
+			if (ctx->authenticated) {
+				LOG_WARN("%s EAPOL socket on %s became unavailable: %s; reopening",
+					 ctx->backend_name, ctx->device,
+					 strerror(recv_errno));
+				raw_socket_close(&ctx->sock);
+				ctx->socket_open = false;
+				ctx->socket_reopen_after_ms = now_ms +
+					EAPOL_SOCKET_REOPEN_INTERVAL_MS;
+				return AUTH_BACKEND_EVENT_NONE;
+			}
 			LOG_ERROR("%s failed to receive EAPOL frame",
 				  ctx->backend_name);
 			ctx->status = AUTH_BACKEND_STATUS_FAILED;

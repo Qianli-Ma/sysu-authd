@@ -182,7 +182,7 @@ TARGET_CROSS    交叉编译前缀，例如 arm-openwrt-linux-muslgnueabi-
 PKG_ARCH        opkg 包架构名，例如 arm_cortex-a7_neon-vfpv4、mipsel_24kc
 OUT_DIR         输出目录
 BUILD_LUCI      是否生成 LuCI 包，1（默认）或 0
-PKG_VERSION     包版本，默认 0.1.0
+PKG_VERSION     包版本，默认 0.1.1
 PKG_RELEASE     包 release，默认 1
 ```
 
