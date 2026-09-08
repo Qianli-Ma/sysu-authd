@@ -1,5 +1,6 @@
 'use strict';
 'require form';
+'require poll';
 'require rpc';
 'require tools.widgets as widgets';
 'require uci';
@@ -15,6 +16,17 @@ var callSetPassword = rpc.declare({
 var callStart = rpc.declare({ object: 'sysu-authd', method: 'start' });
 var callStop = rpc.declare({ object: 'sysu-authd', method: 'stop' });
 var callReconnect = rpc.declare({ object: 'sysu-authd', method: 'reconnect' });
+
+function networkStatusText(status) {
+	return '%s / %s / %s'.format(status.device || '-', status.wan_ip || '-', status.gateway || '-');
+}
+
+function updateStatusValue(id, value) {
+	var node = document.getElementById(id);
+
+	if (node)
+		node.textContent = value;
+}
 
 return view.extend({
 	load: function() {
@@ -37,13 +49,17 @@ return view.extend({
 		s.tab('advanced', _('Advanced settings'));
 
 		var state = s.taboption('basic', form.DummyValue, '_state', _('Current state'));
-		state.cfgvalue = function() { return status.state || _('Unavailable'); };
+		state.renderWidget = function() {
+			return E('span', { id: 'sysu-authd-state' }, status.state || _('Unavailable'));
+		};
 		var detail = s.taboption('basic', form.DummyValue, '_detail', _('Network status'));
-		detail.cfgvalue = function() {
-			return '%s / %s / %s'.format(status.device || '-', status.wan_ip || '-', status.gateway || '-');
+		detail.renderWidget = function() {
+			return E('span', { id: 'sysu-authd-network-status' }, networkStatusText(status));
 		};
 		var lastError = s.taboption('basic', form.DummyValue, '_last_error', _('Last error'));
-		lastError.cfgvalue = function() { return status.last_error || '-'; };
+		lastError.renderWidget = function() {
+			return E('span', { id: 'sysu-authd-last-error' }, status.last_error || '-');
+		};
 
 		[ [ 'start', _('Start'), callStart ], [ 'stop', _('Stop'), callStop ], [ 'reconnect', _('Reconnect'), callReconnect ] ].forEach(function(action) {
 			var button = s.taboption('basic', form.Button, '_' + action[0], action[1]);
@@ -104,6 +120,16 @@ return view.extend({
 		version.value('2');
 		version.default = '1';
 
-		return m.render();
+		return m.render().then(function(node) {
+			poll.add(function() {
+				return L.resolveDefault(callStatus(), {}).then(function(currentStatus) {
+					updateStatusValue('sysu-authd-state', currentStatus.state || _('Unavailable'));
+					updateStatusValue('sysu-authd-network-status', networkStatusText(currentStatus));
+					updateStatusValue('sysu-authd-last-error', currentStatus.last_error || '-');
+				});
+			}, 2);
+
+			return node;
+		});
 	}
 });
