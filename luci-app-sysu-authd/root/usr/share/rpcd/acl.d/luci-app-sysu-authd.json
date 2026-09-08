@@ -3,13 +3,13 @@
 		"description": "Manage SYSU Auth",
 		"read": {
 			"ubus": {
-				"sysu-authd": [ "status" ]
+				"sysu-authd": [ "status", "password_status" ]
 			},
 			"uci": [ "sysu-authd" ]
 		},
 		"write": {
 			"ubus": {
-				"sysu-authd": [ "start", "stop", "reconnect" ]
+				"sysu-authd": [ "set_password", "start", "stop", "reconnect" ]
 			},
 			"uci": [ "sysu-authd" ]
 		}

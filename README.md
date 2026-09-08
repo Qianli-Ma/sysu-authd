@@ -94,8 +94,8 @@ dist/openwrt/
 
 ```text
 sysu-authd
-sysu-authd_<版本>-<修订号>_<架构>.ipk
-luci-app-sysu-authd_<版本>-<修订号>_all.ipk
+sysu-authd_<version>-<release>_<arch>.ipk
+luci-app-sysu-authd_<version>-<release>_all.ipk
 ```
 
 如果只需要核心守护进程，不需要网页管理界面：
@@ -215,41 +215,64 @@ opkg install /tmp/luci-app-sysu-authd_*.ipk
 
 ## OpenWrt 配置
 
+### 使用 LuCI 配置（推荐）
+
+安装 `sysu-authd` 和 `luci-app-sysu-authd` 后，打开：
+
+```text
+网络 → 中大校园网认证
+```
+
+普通用户只需完成四项设置：
+
+1. 启用自动认证。
+2. 填写校园网 NetID。
+3. 填写校园网密码。
+4. 确认 WAN 物理设备。页面会默认选择 OpenWrt 当前的 WAN 设备，只有识别不正确时才需要手动调整。
+
+点击“保存并应用”即可。密码输入框留空表示保留已经设置的密码。
+
+LuCI 不会把密码写入 UCI，也不会读取或显示已有密码。密码会通过受权限控制的 rpcd 接口单独写入：
+
+```text
+/etc/sysu-authd/password
+```
+
+密码文件和所在目录只允许 `root` 访问。LuCI 中的高级设置通常不需要修改；默认使用锐捷兼容模式、EAPOL 版本 1，并在认证成功后自动更新 WAN DHCP。
+
+### 使用命令行配置
+
 默认 UCI 配置位于：
 
 ```text
 /etc/config/sysu-authd
 ```
 
-建议把密码单独保存到：
+密码单独保存到：
 
 ```text
 /etc/sysu-authd/password
 ```
 
-示例：
+最小配置示例：
 
 ```sh
 mkdir -p /etc/sysu-authd
-printf '%s\n' '你的校园网密码' >/etc/sysu-authd/password
+printf '%s\n' '<your-password>' >/etc/sysu-authd/password
 chmod 0600 /etc/sysu-authd/password
 
 uci set sysu-authd.main.enabled='1'
 uci set sysu-authd.main.interface='wan'
 uci set sysu-authd.main.device='eth0'
-uci set sysu-authd.main.username='你的NetID'
+uci set sysu-authd.main.username='<your-netid>'
 uci set sysu-authd.main.password_file='/etc/sysu-authd/password'
-uci set sysu-authd.main.profile='sysu_ruijie'
-uci set sysu-authd.main.auth_backend='ruijie_compat'
-uci set sysu-authd.main.identity_format='%u'
-uci set sysu-authd.main.eapol_version='1'
 uci commit sysu-authd
 
 /etc/init.d/sysu-authd enable
 /etc/init.d/sysu-authd restart
 ```
 
-重要配置项：
+高级配置项及默认值：
 
 ```text
 enabled                     是否启用服务

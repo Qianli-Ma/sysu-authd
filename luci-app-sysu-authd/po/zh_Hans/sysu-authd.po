@@ -13,12 +13,6 @@ msgstr ""
 msgid "SYSU Auth"
 msgstr "中大校园网认证"
 
-msgid "Configure and monitor campus-network 802.1X authentication. Store the password separately in /etc/sysu-authd/password with mode 0600."
-msgstr "配置并监控校园网 802.1X 认证。请将密码单独保存在 /etc/sysu-authd/password，并把权限设置为 0600。"
-
-msgid "Service"
-msgstr "服务"
-
 msgid "Current state"
 msgstr "当前状态"
 
@@ -40,23 +34,8 @@ msgstr "停止"
 msgid "Reconnect"
 msgstr "重新连接"
 
-msgid "Enable service"
-msgstr "启用服务"
-
-msgid "Logical interface"
-msgstr "逻辑接口"
-
-msgid "Physical device"
-msgstr "物理设备"
-
 msgid "NetID"
 msgstr "NetID"
-
-msgid "Password file"
-msgstr "密码文件"
-
-msgid "Profile"
-msgstr "配置方案"
 
 msgid "Authentication backend"
 msgstr "认证后端"
@@ -67,14 +46,59 @@ msgstr "身份格式"
 msgid "EAPOL version"
 msgstr "EAPOL 版本"
 
-msgid "Renew DHCP after success"
-msgstr "认证成功后更新 DHCP"
+msgid "Enter your campus-network account and select the physical WAN device. The remaining defaults work for most SYSU Ruijie networks."
+msgstr "填写校园网账号并选择 WAN 物理设备即可。其余默认设置适用于大多数中大锐捷网络。"
 
-msgid "Enable health checks"
-msgstr "启用在线检查"
+msgid "Campus network authentication"
+msgstr "校园网认证"
 
-msgid "Send logoff when stopping"
-msgstr "停止时发送下线报文"
+msgid "Basic settings"
+msgstr "基本设置"
 
-msgid "Allow reauthentication"
-msgstr "允许重新认证"
+msgid "Advanced settings"
+msgstr "高级设置"
+
+msgid "Enable automatic authentication"
+msgstr "启用自动认证"
+
+msgid "Start authentication automatically after the router boots."
+msgstr "路由器启动后自动开始校园网认证。"
+
+msgid "Your SYSU campus-network account name."
+msgstr "你的中大校园网 NetID。"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Stored separately in /etc/sysu-authd/password with root-only permissions. Leave blank to keep the current password."
+msgstr "密码单独保存在 /etc/sysu-authd/password，仅 root 可读。留空表示不修改当前密码。"
+
+msgid "Password is configured"
+msgstr "密码已设置"
+
+msgid "Enter your campus-network password"
+msgstr "请输入校园网密码"
+
+msgid "The password must be a single line of at most 255 characters."
+msgstr "密码必须为单行，且不能超过 255 个字符。"
+
+msgid "WAN physical device"
+msgstr "WAN 物理设备"
+
+msgid "Select the device connected to the campus-network wall port. The current OpenWrt WAN device is selected by default."
+msgstr "请选择连接校园网墙上端口的设备，默认使用当前 OpenWrt WAN 设备。"
+
+msgid "OpenWrt logical interface"
+msgstr "OpenWrt 逻辑接口"
+
+msgid "Used to renew DHCP after authentication. Usually leave this as wan."
+msgstr "用于在认证成功后更新 DHCP，通常保持为 wan。"
+
+msgid "Use Ruijie compatibility mode unless your network uses plain EAPOL."
+msgstr "除非网络使用标准 EAPOL，否则请保留锐捷兼容模式。"
+
+msgid "%u is replaced with the NetID. Most users should keep the default."
+msgstr "%u 会替换为 NetID，大多数用户无需修改。"
+
+msgid "Version 1 is the most compatible choice for Ruijie networks."
+msgstr "版本 1 对锐捷网络的兼容性通常最好。"

@@ -13,12 +13,6 @@ msgstr ""
 msgid "SYSU Auth"
 msgstr ""
 
-msgid "Configure and monitor campus-network 802.1X authentication. Store the password separately in /etc/sysu-authd/password with mode 0600."
-msgstr ""
-
-msgid "Service"
-msgstr ""
-
 msgid "Current state"
 msgstr ""
 
@@ -40,22 +34,7 @@ msgstr ""
 msgid "Reconnect"
 msgstr ""
 
-msgid "Enable service"
-msgstr ""
-
-msgid "Logical interface"
-msgstr ""
-
-msgid "Physical device"
-msgstr ""
-
 msgid "NetID"
-msgstr ""
-
-msgid "Password file"
-msgstr ""
-
-msgid "Profile"
 msgstr ""
 
 msgid "Authentication backend"
@@ -67,14 +46,59 @@ msgstr ""
 msgid "EAPOL version"
 msgstr ""
 
-msgid "Renew DHCP after success"
+msgid "Enter your campus-network account and select the physical WAN device. The remaining defaults work for most SYSU Ruijie networks."
 msgstr ""
 
-msgid "Enable health checks"
+msgid "Campus network authentication"
 msgstr ""
 
-msgid "Send logoff when stopping"
+msgid "Basic settings"
 msgstr ""
 
-msgid "Allow reauthentication"
+msgid "Advanced settings"
+msgstr ""
+
+msgid "Enable automatic authentication"
+msgstr ""
+
+msgid "Start authentication automatically after the router boots."
+msgstr ""
+
+msgid "Your SYSU campus-network account name."
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Stored separately in /etc/sysu-authd/password with root-only permissions. Leave blank to keep the current password."
+msgstr ""
+
+msgid "Password is configured"
+msgstr ""
+
+msgid "Enter your campus-network password"
+msgstr ""
+
+msgid "The password must be a single line of at most 255 characters."
+msgstr ""
+
+msgid "WAN physical device"
+msgstr ""
+
+msgid "Select the device connected to the campus-network wall port. The current OpenWrt WAN device is selected by default."
+msgstr ""
+
+msgid "OpenWrt logical interface"
+msgstr ""
+
+msgid "Used to renew DHCP after authentication. Usually leave this as wan."
+msgstr ""
+
+msgid "Use Ruijie compatibility mode unless your network uses plain EAPOL."
+msgstr ""
+
+msgid "%u is replaced with the NetID. Most users should keep the default."
+msgstr ""
+
+msgid "Version 1 is the most compatible choice for Ruijie networks."
 msgstr ""

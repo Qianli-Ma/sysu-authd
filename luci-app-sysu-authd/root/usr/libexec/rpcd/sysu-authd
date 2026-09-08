@@ -1,11 +1,56 @@
 #!/bin/sh
+# shellcheck disable=SC1090,SC3043
+
+PASSWORD_DIR="${PASSWORD_DIR:-/etc/sysu-authd}"
+PASSWORD_FILE="${PASSWORD_FILE:-$PASSWORD_DIR/password}"
+JSHN_LIB="${JSHN_LIB:-/usr/share/libubox/jshn.sh}"
+
+set_password() {
+	local input password tmp newline carriage
+
+	. "$JSHN_LIB"
+	input="$(cat)"
+	json_load "$input" || return 1
+	json_get_var password password
+
+	[ -n "$password" ] || return 1
+	[ "${#password}" -le 255 ] || return 1
+	newline='
+'
+	carriage="$(printf '\r_')"
+	carriage="${carriage%_}"
+	case "$password" in
+		*"$newline"*|*"$carriage"*) return 1 ;;
+	esac
+
+	mkdir -p "$PASSWORD_DIR" || return 1
+	chmod 0700 "$PASSWORD_DIR" || return 1
+	umask 077
+	tmp="$PASSWORD_FILE.tmp.$$"
+	trap 'rm -f "$tmp"' EXIT INT TERM
+	printf '%s\n' "$password" >"$tmp" || return 1
+	chmod 0600 "$tmp" || return 1
+	mv -f "$tmp" "$PASSWORD_FILE" || return 1
+	trap - EXIT INT TERM
+	echo '{"saved":true}'
+}
 
 case "$1" in
 	list)
-		echo '{"status":{},"start":{},"stop":{},"reconnect":{}}'
+		echo '{"status":{},"password_status":{},"set_password":{"password":"String"},"start":{},"stop":{},"reconnect":{}}'
 		;;
 	call)
 		case "$2" in
+			password_status)
+				if [ -s "$PASSWORD_FILE" ]; then
+					echo '{"configured":true}'
+				else
+					echo '{"configured":false}'
+				fi
+				;;
+			set_password)
+				set_password || exit 1
+				;;
 			status)
 				if [ -s /var/run/sysu-authd.status ]; then
 					cat /var/run/sysu-authd.status
