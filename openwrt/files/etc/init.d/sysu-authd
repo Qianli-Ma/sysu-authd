@@ -1,0 +1,82 @@
+#!/bin/sh /etc/rc.common
+# shellcheck disable=SC2034,SC3043
+
+START=95
+STOP=10
+USE_PROCD=1
+
+PROG=/usr/sbin/sysu-authd
+RUNTIME_CONFIG=/var/run/sysu-authd.conf
+
+append_setting() {
+	printf '%s=%s\n' "$1" "$2" >>"$RUNTIME_CONFIG"
+}
+
+start_service() {
+	local enabled interface device username password_file profile auth_backend
+	local identity_format eapol_version dhcp_after_success healthcheck_enable
+	local logoff_on_stop reauth_enable retry_initial retry_max retry_forever
+	local log_level auth_timeout_sec dhcp_timeout_sec online_check_interval_sec
+	local tick_interval_msec
+
+	config_load sysu-authd
+	config_get_bool enabled main enabled 0
+	[ "$enabled" -eq 1 ] || return 0
+
+	config_get interface main interface wan
+	config_get device main device
+	config_get username main username
+	config_get password_file main password_file /etc/sysu-authd/password
+	config_get profile main profile sysu_ruijie
+	config_get auth_backend main auth_backend ruijie_compat
+	config_get identity_format main identity_format '%u'
+	config_get eapol_version main eapol_version 1
+	config_get_bool dhcp_after_success main dhcp_after_success 1
+	config_get_bool healthcheck_enable main healthcheck_enable 1
+	config_get_bool logoff_on_stop main logoff_on_stop 1
+	config_get_bool reauth_enable main reauth_enable 1
+	config_get retry_initial main retry_initial 3
+	config_get retry_max main retry_max 300
+	config_get_bool retry_forever main retry_forever 1
+	config_get log_level main log_level info
+	config_get auth_timeout_sec main auth_timeout_sec 30
+	config_get dhcp_timeout_sec main dhcp_timeout_sec 30
+	config_get online_check_interval_sec main online_check_interval_sec 10
+	config_get tick_interval_msec main tick_interval_msec 250
+
+	: >"$RUNTIME_CONFIG"
+	chmod 0600 "$RUNTIME_CONFIG"
+	append_setting enabled 1
+	append_setting interface "$interface"
+	append_setting device "$device"
+	append_setting username "$username"
+	append_setting password_file "$password_file"
+	append_setting profile "$profile"
+	append_setting auth_backend "$auth_backend"
+	append_setting identity_format "$identity_format"
+	append_setting eapol_version "$eapol_version"
+	append_setting dhcp_after_success "$dhcp_after_success"
+	append_setting healthcheck_enable "$healthcheck_enable"
+	append_setting logoff_on_stop "$logoff_on_stop"
+	append_setting reauth_enable "$reauth_enable"
+	append_setting retry_policy "initial:$retry_initial,max:$retry_max,forever:$retry_forever"
+	append_setting log_level "$log_level"
+	append_setting auth_timeout_sec "$auth_timeout_sec"
+	append_setting dhcp_timeout_sec "$dhcp_timeout_sec"
+	append_setting online_check_interval_sec "$online_check_interval_sec"
+	append_setting tick_interval_msec "$tick_interval_msec"
+
+	procd_open_instance
+	procd_set_param command "$PROG" --config "$RUNTIME_CONFIG"
+	procd_set_param respawn 3600 5 5
+	procd_set_param file /etc/config/sysu-authd "$password_file"
+	procd_close_instance
+}
+
+reload_service() {
+	restart
+}
+
+service_triggers() {
+	procd_add_reload_trigger sysu-authd
+}

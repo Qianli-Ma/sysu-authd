@@ -1,0 +1,80 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: sysu-authd\n"
+"PO-Revision-Date: 2026-09-08 00:00+0000\n"
+"Last-Translator: sysu-authd contributors\n"
+"Language-Team: Chinese (Simplified)\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "SYSU Auth"
+msgstr "中大校园网认证"
+
+msgid "Configure and monitor campus-network 802.1X authentication. Store the password separately in /etc/sysu-authd/password with mode 0600."
+msgstr "配置并监控校园网 802.1X 认证。请将密码单独保存在 /etc/sysu-authd/password，并把权限设置为 0600。"
+
+msgid "Service"
+msgstr "服务"
+
+msgid "Current state"
+msgstr "当前状态"
+
+msgid "Unavailable"
+msgstr "无法获取"
+
+msgid "Network status"
+msgstr "网络状态"
+
+msgid "Last error"
+msgstr "最近错误"
+
+msgid "Start"
+msgstr "启动"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Reconnect"
+msgstr "重新连接"
+
+msgid "Enable service"
+msgstr "启用服务"
+
+msgid "Logical interface"
+msgstr "逻辑接口"
+
+msgid "Physical device"
+msgstr "物理设备"
+
+msgid "NetID"
+msgstr "NetID"
+
+msgid "Password file"
+msgstr "密码文件"
+
+msgid "Profile"
+msgstr "配置方案"
+
+msgid "Authentication backend"
+msgstr "认证后端"
+
+msgid "Identity format"
+msgstr "身份格式"
+
+msgid "EAPOL version"
+msgstr "EAPOL 版本"
+
+msgid "Renew DHCP after success"
+msgstr "认证成功后更新 DHCP"
+
+msgid "Enable health checks"
+msgstr "启用在线检查"
+
+msgid "Send logoff when stopping"
+msgstr "停止时发送下线报文"
+
+msgid "Allow reauthentication"
+msgstr "允许重新认证"

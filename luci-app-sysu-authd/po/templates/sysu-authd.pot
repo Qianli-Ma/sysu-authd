@@ -1,0 +1,80 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: sysu-authd\n"
+"POT-Creation-Date: 2026-09-08 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: sysu-authd contributors\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "SYSU Auth"
+msgstr ""
+
+msgid "Configure and monitor campus-network 802.1X authentication. Store the password separately in /etc/sysu-authd/password with mode 0600."
+msgstr ""
+
+msgid "Service"
+msgstr ""
+
+msgid "Current state"
+msgstr ""
+
+msgid "Unavailable"
+msgstr ""
+
+msgid "Network status"
+msgstr ""
+
+msgid "Last error"
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Reconnect"
+msgstr ""
+
+msgid "Enable service"
+msgstr ""
+
+msgid "Logical interface"
+msgstr ""
+
+msgid "Physical device"
+msgstr ""
+
+msgid "NetID"
+msgstr ""
+
+msgid "Password file"
+msgstr ""
+
+msgid "Profile"
+msgstr ""
+
+msgid "Authentication backend"
+msgstr ""
+
+msgid "Identity format"
+msgstr ""
+
+msgid "EAPOL version"
+msgstr ""
+
+msgid "Renew DHCP after success"
+msgstr ""
+
+msgid "Enable health checks"
+msgstr ""
+
+msgid "Send logoff when stopping"
+msgstr ""
+
+msgid "Allow reauthentication"
+msgstr ""

@@ -1,0 +1,36 @@
+#!/bin/sh
+
+case "$1" in
+	list)
+		echo '{"status":{},"start":{},"stop":{},"reconnect":{}}'
+		;;
+	call)
+		case "$2" in
+			status)
+				if [ -s /var/run/sysu-authd.status ]; then
+					cat /var/run/sysu-authd.status
+				else
+					echo '{"enabled":false,"state":"STOPPED","last_error":"status unavailable"}'
+				fi
+				;;
+			start)
+				/etc/init.d/sysu-authd start >/dev/null 2>&1 || exit 1
+				echo '{}'
+				;;
+			stop)
+				/etc/init.d/sysu-authd stop >/dev/null 2>&1 || exit 1
+				echo '{}'
+				;;
+			reconnect)
+				/etc/init.d/sysu-authd restart >/dev/null 2>&1 || exit 1
+				echo '{}'
+				;;
+			*)
+				exit 1
+				;;
+		esac
+		;;
+	*)
+		exit 1
+		;;
+esac

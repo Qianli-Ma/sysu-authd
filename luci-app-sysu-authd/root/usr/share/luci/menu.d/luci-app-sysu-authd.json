@@ -1,0 +1,14 @@
+{
+	"admin/network/sysu-authd": {
+		"title": "SYSU Auth",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "sysu-authd/overview"
+		},
+		"depends": {
+			"acl": [ "luci-app-sysu-authd" ],
+			"uci": { "sysu-authd": true }
+		}
+	}
+}

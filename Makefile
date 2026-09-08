@@ -1,3 +1,10 @@
+ifneq ($(strip $(TOPDIR)),)
+
+# Allow the repository to be cloned directly into an OpenWrt package directory.
+include $(CURDIR)/openwrt/Makefile
+
+else
+
 CC ?= cc
 AR ?= ar
 
@@ -34,7 +41,7 @@ CFLAGS += -std=c11 -Wall -Wextra -Wpedantic -Werror -MMD -MP
 LDFLAGS ?=
 LDLIBS ?=
 
-.PHONY: all clean install uninstall check
+.PHONY: all clean install uninstall check check-openwrt
 
 all: $(TARGET)
 
@@ -53,11 +60,19 @@ uninstall:
 	rm -f $(DESTDIR)/usr/sbin/$(TARGET)
 
 check: all
-	printf 'secret\n' >/tmp/sysu-authd-password
-	chmod 0600 /tmp/sysu-authd-password
+	@set -eu; \
+	password_file=/tmp/sysu-authd-password; \
+	trap 'rm -f "$$password_file"' EXIT; \
+	printf 'secret\n' >"$$password_file"; \
+	chmod 0600 "$$password_file"; \
 	./$(TARGET) --config docs/example.conf --dry-run
+
+check-openwrt:
+	./scripts/check-openwrt-assets.sh
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
 
 -include $(DEPS)
+
+endif

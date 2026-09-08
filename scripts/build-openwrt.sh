@@ -2,20 +2,28 @@
 set -eu
 
 SDK="${SDK:-}"
-PROJECT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$PROJECT_DIR/dist/openwrt}"
 PKG_NAME="${PKG_NAME:-sysu-authd}"
 PKG_VERSION="${PKG_VERSION:-0.1.0}"
 PKG_RELEASE="${PKG_RELEASE:-1}"
 LUCI_PKG_NAME="${LUCI_PKG_NAME:-luci-app-sysu-authd}"
 LUCI_PKG_ARCH="all"
+BUILD_LUCI="${BUILD_LUCI:-1}"
+
+case "$BUILD_LUCI" in
+	0|1) ;;
+	*) echo "BUILD_LUCI must be 0 or 1" >&2; exit 1 ;;
+esac
 
 if [ -z "$SDK" ]; then
 	echo "usage: SDK=/path/to/openwrt-sdk $0" >&2
 	exit 1
 fi
 
-SDK="$(CDPATH= cd -- "$SDK" && pwd)"
+"$PROJECT_DIR/scripts/check-openwrt-assets.sh"
+
+SDK="$(CDPATH='' cd -- "$SDK" && pwd)"
 TOOLCHAIN="${TOOLCHAIN:-$(find "$SDK/staging_dir" -maxdepth 1 -type d -name 'toolchain-*' | head -n 1)}"
 TARGET_STAGING="${TARGET_STAGING:-$(find "$SDK/staging_dir" -maxdepth 1 -type d -name 'target-*' | head -n 1)}"
 
@@ -25,7 +33,7 @@ if [ -z "$TOOLCHAIN" ] || [ -z "$TARGET_STAGING" ]; then
 fi
 
 if [ -f "$TOOLCHAIN/info.mk" ]; then
-	# shellcheck disable=SC1090
+	# shellcheck disable=SC1091
 	. "$TOOLCHAIN/info.mk"
 fi
 
@@ -79,7 +87,6 @@ EOF_DEBIAN
 		TARGET="$PKG_NAME-openwrt"
 	cp "$PKG_NAME-openwrt" "$OUT_DIR/$PKG_NAME"
 	PATH="$TOOLCHAIN/bin:$PATH" STAGING_DIR="$SDK/staging_dir" "$STRIP" "$OUT_DIR/$PKG_NAME"
-	make TARGET="$PKG_NAME-openwrt" clean
 )
 
 ROOT="$OUT_DIR/pkgroot"
@@ -91,22 +98,14 @@ LUCI_IPK="$OUT_DIR/${LUCI_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_${LUCI_PKG_ARC
 
 rm -rf "$ROOT" "$WORK" "$LUCI_ROOT" "$LUCI_WORK"
 mkdir -p "$ROOT/usr/sbin" "$ROOT/etc/config" "$ROOT/etc/init.d" \
-	"$ROOT/etc/sysu-authd" "$ROOT/usr/libexec/rpcd" "$WORK/control"
-mkdir -p "$LUCI_ROOT/www" "$LUCI_WORK/control"
+	"$ROOT/etc/sysu-authd" "$WORK/control"
 
 install -m 0755 "$OUT_DIR/$PKG_NAME" "$ROOT/usr/sbin/$PKG_NAME"
 install -m 0644 "$PROJECT_DIR/openwrt/files/etc/config/sysu-authd" \
 	"$ROOT/etc/config/sysu-authd"
 install -m 0755 "$PROJECT_DIR/openwrt/files/etc/init.d/sysu-authd" \
 	"$ROOT/etc/init.d/sysu-authd"
-install -m 0755 "$PROJECT_DIR/openwrt/files/usr/libexec/rpcd/sysu-authd" \
-	"$ROOT/usr/libexec/rpcd/sysu-authd"
-
-cp -R "$PROJECT_DIR/openwrt/luci-app-sysu-authd/htdocs/." "$LUCI_ROOT/www/"
-cp -R "$PROJECT_DIR/openwrt/luci-app-sysu-authd/root/." "$LUCI_ROOT/"
-
 DAEMON_SIZE="$(du -sk "$ROOT" | awk '{print $1}')"
-LUCI_SIZE="$(du -sk "$LUCI_ROOT" | awk '{print $1}')"
 
 cat > "$WORK/control/control" <<EOF_CONTROL
 Package: $PKG_NAME
@@ -125,14 +124,15 @@ cat > "$WORK/control/conffiles" <<'EOF_CONFFILES'
 /etc/config/sysu-authd
 EOF_CONFFILES
 
-cat > "$WORK/control/postinst" <<'EOF_POSTINST'
-#!/bin/sh
-[ -n "${IPKG_INSTROOT}" ] || killall -HUP rpcd 2>/dev/null || true
-exit 0
-EOF_POSTINST
-chmod 0755 "$WORK/control/postinst"
+build_ipk "$ROOT" "$WORK" "$IPK"
 
-cat > "$LUCI_WORK/control/control" <<EOF_CONTROL
+if [ "$BUILD_LUCI" = "1" ]; then
+	mkdir -p "$LUCI_ROOT/www" "$LUCI_WORK/control"
+	cp -R "$PROJECT_DIR/luci-app-sysu-authd/htdocs/." "$LUCI_ROOT/www/"
+	cp -R "$PROJECT_DIR/luci-app-sysu-authd/root/." "$LUCI_ROOT/"
+	LUCI_SIZE="$(du -sk "$LUCI_ROOT" | awk '{print $1}')"
+
+	cat > "$LUCI_WORK/control/control" <<EOF_CONTROL
 Package: $LUCI_PKG_NAME
 Version: $PKG_VERSION-$PKG_RELEASE
 Depends: sysu-authd, rpcd, luci-base
@@ -145,7 +145,7 @@ Maintainer: sysu-authd project
 Description: LuCI web interface for sysu-authd
 EOF_CONTROL
 
-cat > "$LUCI_WORK/control/postinst" <<'EOF_POSTINST'
+	cat > "$LUCI_WORK/control/postinst" <<'EOF_POSTINST'
 #!/bin/sh
 [ -n "${IPKG_INSTROOT}" ] || {
 	rm -f /tmp/luci-indexcache
@@ -154,12 +154,15 @@ cat > "$LUCI_WORK/control/postinst" <<'EOF_POSTINST'
 }
 exit 0
 EOF_POSTINST
-chmod 0755 "$LUCI_WORK/control/postinst"
-
-build_ipk "$ROOT" "$WORK" "$IPK"
-build_ipk "$LUCI_ROOT" "$LUCI_WORK" "$LUCI_IPK"
+	chmod 0755 "$LUCI_WORK/control/postinst"
+	build_ipk "$LUCI_ROOT" "$LUCI_WORK" "$LUCI_IPK"
+fi
 
 file "$OUT_DIR/$PKG_NAME"
 file "$IPK"
-file "$LUCI_IPK"
-sha256sum "$OUT_DIR/$PKG_NAME" "$IPK" "$LUCI_IPK"
+if [ "$BUILD_LUCI" = "1" ]; then
+	file "$LUCI_IPK"
+	sha256sum "$OUT_DIR/$PKG_NAME" "$IPK" "$LUCI_IPK"
+else
+	sha256sum "$OUT_DIR/$PKG_NAME" "$IPK"
+fi

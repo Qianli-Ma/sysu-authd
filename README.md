@@ -1,10 +1,14 @@
-# sysu-authd
+# sysu-authd：中大校园网 OpenWrt 自动认证
+
+> **项目来源与致谢**
+>
+> 本仓库在 [zjccf/sysu-authd](https://github.com/zjccf/sysu-authd) 原始项目的基础上继续整理和维护。衷心感谢 [@zjccf](https://github.com/zjccf) 完成核心认证程序、OpenWrt 集成思路和原始文档，为本项目奠定了基础。
 
 `sysu-authd` 是一个面向 OpenWrt 的校园网锐捷 / 802.1X 自动认证守护进程，使用 C 语言编写。项目用于中山大学 SYSU 校园网场景，但整体设计尽量把“协议处理”“部署环境 profile”“OpenWrt 集成”拆开，方便后续适配更多学校、更多 OpenWrt 设备和更多认证细节。
 
 它的目标是在路由器上自动完成锐捷的校园网登录认证，并在认证成功后触发 DHCP，让路由器开机后自动联网，这样就可以使用一个校园网账号连接多个设备；同时支持掉线重连、在线状态导出和 LuCI 页面操作。
 
-![alt text](1.png) ![alt text](2.png)
+![LuCI 配置页面](1.png) ![LuCI 状态页面](2.png)
 
 
 
@@ -40,30 +44,54 @@ OpenWrt 启动
   -> watchdog 持续检查链路、认证后端和网络状态
 ```
 
-## 设计结构
+## 项目结构
 
 主要目录：
 
 ```text
-src/        C 源码
-openwrt/    OpenWrt package、init 脚本、UCI 默认配置、rpcd、LuCI
-scripts/    辅助构建脚本
+src/                     C 源码
+openwrt/                 核心 OpenWrt 软件包、UCI 默认配置和 procd 启动脚本
+luci-app-sysu-authd/     符合 LuCI 目录规范的独立网页管理软件包
+scripts/                 构建、检查和 SDK 暂存脚本
+docs/                    示例配置
 ```
+
+核心守护进程与 LuCI 网页管理界面是两个独立软件包：
+
+- `sysu-authd` 只依赖基础系统，可独立安装和运行。
+- `luci-app-sysu-authd` 依赖 `sysu-authd`、`rpcd` 和 `luci-base`，使用标准的 `luci.mk` 构建方式。
+
+## 仓库名称说明
+
+当前仓库同时包含核心守护进程和可选的 LuCI 管理界面，因此保留 `sysu-authd` 作为仓库名称更准确。只有在将网页界面拆分为完全独立的仓库时，才建议把该独立仓库命名为 `luci-app-sysu-authd`。
 
 
 ## OpenWrt SDK 交叉编译
 
 推荐使用目标设备对应版本的 OpenWrt SDK 构建。请尽量选择与路由器固件版本、目标平台、libc 和架构一致的 SDK，否则生成的二进制或 `.ipk` 可能无法安装或运行。
 
-### 方法一：使用 OpenWrt SDK 原生包构建
+### 方法一：使用 OpenWrt SDK 原生包构建（推荐）
 
-假设 SDK 路径是 `/path/to/openwrt-sdk`，可以把本项目放入 SDK 的 `package/` 目录，例如：
+使用辅助脚本把核心守护进程和可选的 LuCI 软件包暂存成 SDK 能识别的两个独立软件包：
 
 ```sh
-cp -a /path/to/sysu-authd /path/to/openwrt-sdk/package/sysu-authd
+cd /path/to/sysu-authd
+SDK=/path/to/openwrt-sdk ./scripts/stage-openwrt-packages.sh
+
 cd /path/to/openwrt-sdk
-make package/sysu-authd/{clean,compile} V=s
+make package/sysu-authd/clean package/sysu-authd/compile V=s
+make package/luci-app-sysu-authd/clean package/luci-app-sysu-authd/compile V=s
 ```
+
+只构建核心守护进程，跳过 LuCI 与 rpcd 依赖：
+
+```sh
+SDK=/path/to/openwrt-sdk WITH_LUCI=0 ./scripts/stage-openwrt-packages.sh
+```
+
+目标目录已存在时脚本会停止，避免覆盖已有包。确认要替换先前暂存的副本时可加 `FORCE=1`。
+
+也可以把整个仓库直接克隆到 `SDK/package/sysu-authd`；根目录 `Makefile` 会在 OpenWrt 构建环境中自动载入核心软件包定义。此方式只提供核心守护进程；LuCI 软件包请使用上面的暂存脚本。
 
 构建产物通常会出现在 SDK 的：
 
@@ -74,12 +102,20 @@ bin/packages/<arch>/luci/
 
 如果需要 LuCI 包，请确保 SDK 中有 LuCI feed，且已安装相关 feed 索引。
 
+`luci-app-sysu-authd` 使用 LuCI 官方的 `luci.mk` 构建机制。如果暂存脚本提示找不到 `feeds/luci/luci.mk`，请先更新并安装 LuCI feed，或者使用 `WITH_LUCI=0` 只构建核心守护进程。
+
 ### 方法二：使用项目内通用交叉编译脚本
 
 项目提供了一个轻量脚本，可直接调用 SDK toolchain 编译并生成 gzip-tar 风格的 `.ipk`：
 
 ```sh
 SDK=/path/to/openwrt-sdk ./scripts/build-openwrt.sh
+```
+
+只生成核心守护进程软件包：
+
+```sh
+SDK=/path/to/openwrt-sdk BUILD_LUCI=0 ./scripts/build-openwrt.sh
 ```
 
 默认输出目录：
@@ -117,6 +153,7 @@ TARGET_STAGING  target staging 目录，通常可自动推断
 TARGET_CROSS    交叉编译前缀，例如 arm-openwrt-linux-muslgnueabi-
 PKG_ARCH        opkg 包架构名，例如 arm_cortex-a7_neon-vfpv4、mipsel_24kc
 OUT_DIR         输出目录
+BUILD_LUCI      是否生成 LuCI 包，1（默认）或 0
 PKG_VERSION     包版本，默认 0.1.0
 PKG_RELEASE     包 release，默认 1
 ```
@@ -146,7 +183,7 @@ opkg install /tmp/sysu-authd_*.ipk
 opkg install /tmp/luci-app-sysu-authd_*.ipk
 ```
 
-如果只需要命令行和 ubus，不需要网页界面，可以不安装 `luci-app-sysu-authd`。
+如果只需要守护进程，可以不安装 `luci-app-sysu-authd`。ubus 适配器与网页界面一起放在 LuCI 软件包中，因此不安装该包时请直接使用启动脚本和状态文件。
 
 ## OpenWrt 配置
 
@@ -311,6 +348,12 @@ logread -f -e sysu-authd
 - 日志不会打印密码。
 - ubus/LuCI 状态不会导出密码、challenge、response 或认证摘要。
 - 抓包、debug 日志和 issue 反馈中请自行去除账号、MAC、IP、challenge/response 等敏感信息。
+
+## 许可证
+
+本仓库由 Qianli Ma 及后续贡献者创作的新增内容采用 [MIT 许可证](LICENSE)。
+
+本项目包含源自 [zjccf/sysu-authd](https://github.com/zjccf/sysu-authd) 的代码和文档；其版权仍归原作者所有。由于上游仓库目前未公布许可证，本仓库的 MIT 许可证不代表对上游内容进行重新授权。若要分发或在其他项目中使用完整代码，请同时确认已获得上游作者的许可。
 
 ## 当前限制
 

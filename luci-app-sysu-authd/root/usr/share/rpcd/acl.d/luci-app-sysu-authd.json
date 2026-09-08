@@ -1,0 +1,17 @@
+{
+	"luci-app-sysu-authd": {
+		"description": "Manage SYSU Auth",
+		"read": {
+			"ubus": {
+				"sysu-authd": [ "status" ]
+			},
+			"uci": [ "sysu-authd" ]
+		},
+		"write": {
+			"ubus": {
+				"sysu-authd": [ "start", "stop", "reconnect" ]
+			},
+			"uci": [ "sysu-authd" ]
+		}
+	}
+}
