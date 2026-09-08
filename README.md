@@ -68,9 +68,57 @@ docs/                    示例配置
 
 ## OpenWrt SDK 交叉编译
 
-推荐使用目标设备对应版本的 OpenWrt SDK 构建。请尽量选择与路由器固件版本、目标平台、libc 和架构一致的 SDK，否则生成的二进制或 `.ipk` 可能无法安装或运行。
+请在 Linux 上使用与目标路由器固件版本、平台、libc 和架构匹配的 OpenWrt SDK。SDK 不匹配时，生成的软件包可能无法安装或运行。
 
-### 方法一：使用 OpenWrt SDK 原生包构建（推荐）
+### 一条命令构建（推荐）
+
+进入项目目录，把 SDK 路径作为参数传给构建脚本：
+
+```sh
+./scripts/build-openwrt.sh /path/to/openwrt-sdk
+```
+
+例如：
+
+```sh
+./scripts/build-openwrt.sh /home/user/openwrt-sdk
+```
+
+无需复制源码，也无需配置 LuCI feed。脚本会自动寻找 SDK 中的交叉编译器，并把产物放到：
+
+```text
+dist/openwrt/
+```
+
+默认生成：
+
+```text
+sysu-authd
+sysu-authd_<版本>-<修订号>_<架构>.ipk
+luci-app-sysu-authd_<版本>-<修订号>_all.ipk
+```
+
+如果只需要核心守护进程，不需要网页管理界面：
+
+```sh
+BUILD_LUCI=0 ./scripts/build-openwrt.sh /path/to/openwrt-sdk
+```
+
+也可以继续使用环境变量形式：
+
+```sh
+SDK=/path/to/openwrt-sdk ./scripts/build-openwrt.sh
+```
+
+### 什么是 LuCI feed？
+
+feed 是 OpenWrt 构建系统使用的软件包源。LuCI feed 提供 LuCI 的构建规则及 `luci-base` 等软件包。官方 OpenWrt SDK 通常可以通过 `scripts/feeds` 管理这些软件包；部分厂商 SDK 可能没有附带完整的 LuCI feed。
+
+上面推荐的一条命令构建方式不需要 SDK 中存在 LuCI feed，因为脚本会直接打包本项目的网页资源。安装 LuCI 软件包的路由器仍需具备 `rpcd` 和 `luci-base`，大多数带有 LuCI 管理页面的固件已经包含它们。
+
+只有使用下面的 OpenWrt 原生软件包构建方式时，才需要 SDK 中存在 LuCI feed。
+
+### 使用 OpenWrt 原生软件包系统构建（高级）
 
 使用辅助脚本把核心守护进程和可选的 LuCI 软件包暂存成 SDK 能识别的两个独立软件包：
 
@@ -100,37 +148,17 @@ bin/packages/<arch>/base/
 bin/packages/<arch>/luci/
 ```
 
-如果需要 LuCI 包，请确保 SDK 中有 LuCI feed，且已安装相关 feed 索引。
+如果 SDK 尚未准备 LuCI feed，可先运行：
+
+```sh
+cd /path/to/openwrt-sdk
+./scripts/feeds update luci
+./scripts/feeds install -a -p luci
+```
 
 `luci-app-sysu-authd` 使用 LuCI 官方的 `luci.mk` 构建机制。如果暂存脚本提示找不到 `feeds/luci/luci.mk`，请先更新并安装 LuCI feed，或者使用 `WITH_LUCI=0` 只构建核心守护进程。
 
-### 方法二：使用项目内通用交叉编译脚本
-
-项目提供了一个轻量脚本，可直接调用 SDK toolchain 编译并生成 gzip-tar 风格的 `.ipk`：
-
-```sh
-SDK=/path/to/openwrt-sdk ./scripts/build-openwrt.sh
-```
-
-只生成核心守护进程软件包：
-
-```sh
-SDK=/path/to/openwrt-sdk BUILD_LUCI=0 ./scripts/build-openwrt.sh
-```
-
-默认输出目录：
-
-```text
-dist/openwrt/
-```
-
-输出包括：
-
-```text
-sysu-authd
-sysu-authd_<version>-<release>_<arch>.ipk
-luci-app-sysu-authd_<version>-<release>_all.ipk
-```
+### 自定义构建参数
 
 脚本会从 SDK 的 `staging_dir/toolchain-*` 和 `staging_dir/target-*` 尽量自动推断交叉编译器、target staging 和包架构。不同 SDK 的目录命名可能不同，必要时可以手动指定：
 

@@ -11,13 +11,43 @@ LUCI_PKG_NAME="${LUCI_PKG_NAME:-luci-app-sysu-authd}"
 LUCI_PKG_ARCH="all"
 BUILD_LUCI="${BUILD_LUCI:-1}"
 
+usage() {
+	cat <<EOF_USAGE
+用法：
+  $0 /path/to/openwrt-sdk
+  SDK=/path/to/openwrt-sdk $0
+
+默认生成 sysu-authd 和 luci-app-sysu-authd 软件包。
+只构建核心软件包：BUILD_LUCI=0 $0 /path/to/openwrt-sdk
+EOF_USAGE
+}
+
+case "$#" in
+	0) ;;
+	1)
+		case "$1" in
+			-h|--help) usage; exit 0 ;;
+		esac
+		if [ -n "$SDK" ] && [ "$SDK" != "$1" ]; then
+			echo "SDK 环境变量与命令行参数不一致" >&2
+			exit 1
+		fi
+		SDK="$1"
+		;;
+	*) usage >&2; exit 1 ;;
+esac
+
 case "$BUILD_LUCI" in
 	0|1) ;;
-	*) echo "BUILD_LUCI must be 0 or 1" >&2; exit 1 ;;
+	*) echo "BUILD_LUCI 必须是 0 或 1" >&2; exit 1 ;;
 esac
 
 if [ -z "$SDK" ]; then
-	echo "usage: SDK=/path/to/openwrt-sdk $0" >&2
+	usage >&2
+	exit 1
+fi
+if [ ! -d "$SDK/staging_dir" ]; then
+	echo "不是有效的 OpenWrt SDK（缺少 staging_dir）：$SDK" >&2
 	exit 1
 fi
 
@@ -28,7 +58,7 @@ TOOLCHAIN="${TOOLCHAIN:-$(find "$SDK/staging_dir" -maxdepth 1 -type d -name 'too
 TARGET_STAGING="${TARGET_STAGING:-$(find "$SDK/staging_dir" -maxdepth 1 -type d -name 'target-*' | head -n 1)}"
 
 if [ -z "$TOOLCHAIN" ] || [ -z "$TARGET_STAGING" ]; then
-	echo "failed to find toolchain or target staging directory under $SDK/staging_dir" >&2
+	echo "无法在 $SDK/staging_dir 下找到工具链或目标暂存目录" >&2
 	exit 1
 fi
 
@@ -39,7 +69,7 @@ fi
 
 TARGET_CROSS="${TARGET_CROSS:-}"
 if [ -z "$TARGET_CROSS" ]; then
-	TARGET_CROSS="$(find "$TOOLCHAIN/bin" -maxdepth 1 -type f -name '*-gcc' | sed 's/-gcc$//' | head -n 1)"
+	TARGET_CROSS="$(find "$TOOLCHAIN/bin" -maxdepth 1 \( -type f -o -type l \) -name '*-gcc' | sed 's/-gcc$//' | head -n 1)"
 	TARGET_CROSS="${TARGET_CROSS##*/}-"
 fi
 
@@ -49,7 +79,7 @@ STRIP="${STRIP:-${TARGET_CROSS}strip}"
 PKG_ARCH="${PKG_ARCH:-$(basename "$TARGET_STAGING" | sed -e 's/^target-//' -e 's/_musl.*$//' -e 's/+/_/g')}"
 
 if [ ! -x "$TOOLCHAIN/bin/$CC" ]; then
-	echo "missing OpenWrt compiler: $TOOLCHAIN/bin/$CC" >&2
+	echo "找不到 OpenWrt 交叉编译器：$TOOLCHAIN/bin/$CC" >&2
 	exit 1
 fi
 
@@ -166,3 +196,6 @@ if [ "$BUILD_LUCI" = "1" ]; then
 else
 	sha256sum "$OUT_DIR/$PKG_NAME" "$IPK"
 fi
+
+echo
+echo "构建完成，产物位于：$OUT_DIR"
