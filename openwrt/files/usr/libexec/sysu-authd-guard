@@ -1,0 +1,37 @@
+#!/bin/sh
+# Monitor progress independently of the authentication process. Count elapsed
+# polling intervals instead of comparing wall-clock times (NTP can change them).
+set -u
+
+previous_pid=''
+previous_stamp=''
+stale=0
+
+while sleep 15; do
+	pid="$(ubus -t 5 call service list '{"name":"sysu-authd"}' 2>/dev/null |
+		jsonfilter -e '@["sysu-authd"].instances.instance1.pid' 2>/dev/null)"
+	case "$pid" in
+		''|*[!0-9]*)
+			# No managed process: procd handles exits. Never start a service
+			# here, so an intentional stop remains stopped.
+			previous_pid=''
+			previous_stamp=''
+			stale=0
+			continue
+			;;
+	esac
+	stamp="$(stat -c %Y /var/run/sysu-authd.status 2>/dev/null)" || stamp=''
+	if [ "$pid" != "$previous_pid" ] || [ "$stamp" != "$previous_stamp" ]; then
+		stale=0
+	else
+		stale=$((stale + 15))
+	fi
+	previous_pid="$pid"
+	previous_stamp="$stamp"
+	[ "$stale" -ge 120 ] || continue
+
+	logger -t sysu-authd-guard "No status progress for 120 seconds (pid $pid); asking procd to replace the stalled process"
+	# Signal the managed instance rather than a PID that could have been reused.
+	ubus -t 5 call service signal '{"name":"sysu-authd","instance":"instance1","signal":9}' >/dev/null 2>&1 || true
+	stale=0
+done

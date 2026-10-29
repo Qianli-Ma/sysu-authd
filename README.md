@@ -182,7 +182,7 @@ TARGET_CROSS    交叉编译前缀，例如 arm-openwrt-linux-muslgnueabi-
 PKG_ARCH        opkg 包架构名，例如 arm_cortex-a7_neon-vfpv4、mipsel_24kc
 OUT_DIR         输出目录
 BUILD_LUCI      是否生成 LuCI 包，1（默认）或 0
-PKG_VERSION     包版本，默认 0.1.2
+PKG_VERSION     包版本，默认 0.1.4
 PKG_RELEASE     包 release，默认 1
 ```
 
@@ -239,6 +239,18 @@ LuCI 不会把密码写入 UCI，也不会读取或显示已有密码。密码�
 ```
 
 密码文件和所在目录只允许 `root` 访问。LuCI 中的高级设置通常不需要修改；默认使用锐捷兼容模式、EAPOL 版本 1，并在认证成功后自动更新 WAN DHCP。
+
+安装核心软件包时会自动把 `sysu-authd` 注册为 OpenWrt 开机服务。只要“启用自动认证”已经打开，NetID、密码和 WAN 设备也已经保存，路由器重启后便会自动等待 WAN 链路并重新认证。关闭该选项时，启动脚本仍会被系统调用，但会立即安全退出，不会发起认证。
+
+可以用下面的命令确认开机启动是否已注册：
+
+```sh
+/etc/init.d/sysu-authd enabled && echo enabled
+```
+
+服务由 procd 持续监督：进程异常退出（包括被 OOM killer 杀死）后等待 10 秒重启，不设重试次数上限。独立的轻量监测进程每 15 秒检查主进程的状态文件；约 120–135 秒没有更新时，会终止卡住的主进程，由 procd 拉起并重新认证。监测使用更新是否发生变化，不受 NTP 校时影响；没有网线时的正常 `WAIT_LINK` 仍会更新状态，不会误触发重启。手动停止或关闭自动认证会同时停止监测。
+
+持续内存耗尽时仍会重试，但不能保证资源不足的系统恢复联网；该机制不会重启整台路由器，也不会调整系统 OOM 优先级。
 
 ### 使用命令行配置
 

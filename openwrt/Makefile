@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sysu-authd
-PKG_VERSION:=0.1.2
+PKG_VERSION:=0.1.4
 PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -39,7 +39,8 @@ define Package/sysu-authd/install
 	$(INSTALL_CONF) ./files/etc/config/sysu-authd $(1)/etc/config/sysu-authd
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/sysu-authd $(1)/etc/init.d/sysu-authd
-	$(INSTALL_DIR) $(1)/etc/sysu-authd
+	$(INSTALL_DIR) $(1)/etc/sysu-authd $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/usr/libexec/sysu-authd-guard $(1)/usr/libexec/sysu-authd-guard
 endef
 
 define Package/sysu-authd/conffiles

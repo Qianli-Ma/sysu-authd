@@ -5,6 +5,7 @@ PROJECT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 
 required_files='openwrt/files/etc/config/sysu-authd
 openwrt/files/etc/init.d/sysu-authd
+openwrt/files/usr/libexec/sysu-authd-guard
 luci-app-sysu-authd/Makefile
 luci-app-sysu-authd/LICENSE
 luci-app-sysu-authd/root/usr/libexec/rpcd/sysu-authd

@@ -5,7 +5,7 @@ SDK="${SDK:-}"
 PROJECT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$PROJECT_DIR/dist/openwrt}"
 PKG_NAME="${PKG_NAME:-sysu-authd}"
-PKG_VERSION="${PKG_VERSION:-0.1.2}"
+PKG_VERSION="${PKG_VERSION:-0.1.4}"
 PKG_RELEASE="${PKG_RELEASE:-1}"
 LUCI_PKG_NAME="${LUCI_PKG_NAME:-luci-app-sysu-authd}"
 LUCI_PKG_ARCH="all"
@@ -127,7 +127,7 @@ IPK="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_${PKG_ARCH}.ipk"
 LUCI_IPK="$OUT_DIR/${LUCI_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_${LUCI_PKG_ARCH}.ipk"
 
 rm -rf "$ROOT" "$WORK" "$LUCI_ROOT" "$LUCI_WORK"
-mkdir -p "$ROOT/usr/sbin" "$ROOT/etc/config" "$ROOT/etc/init.d" \
+mkdir -p "$ROOT/usr/sbin" "$ROOT/usr/libexec" "$ROOT/etc/config" "$ROOT/etc/init.d" \
 	"$ROOT/etc/sysu-authd" "$WORK/control"
 
 install -m 0755 "$OUT_DIR/$PKG_NAME" "$ROOT/usr/sbin/$PKG_NAME"
@@ -135,6 +135,8 @@ install -m 0644 "$PROJECT_DIR/openwrt/files/etc/config/sysu-authd" \
 	"$ROOT/etc/config/sysu-authd"
 install -m 0755 "$PROJECT_DIR/openwrt/files/etc/init.d/sysu-authd" \
 	"$ROOT/etc/init.d/sysu-authd"
+install -m 0755 "$PROJECT_DIR/openwrt/files/usr/libexec/sysu-authd-guard" \
+	"$ROOT/usr/libexec/sysu-authd-guard"
 DAEMON_SIZE="$(du -sk "$ROOT" | awk '{print $1}')"
 
 cat > "$WORK/control/control" <<EOF_CONTROL
@@ -153,6 +155,16 @@ EOF_CONTROL
 cat > "$WORK/control/conffiles" <<'EOF_CONFFILES'
 /etc/config/sysu-authd
 EOF_CONFFILES
+
+cat > "$WORK/control/postinst" <<'EOF_POSTINST'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT:-}" ] || {
+	/etc/init.d/sysu-authd enable >/dev/null 2>&1 || true
+	/etc/init.d/sysu-authd restart >/dev/null 2>&1 || true
+}
+exit 0
+EOF_POSTINST
+chmod 0755 "$WORK/control/postinst"
 
 build_ipk "$ROOT" "$WORK" "$IPK"
 
